@@ -1,0 +1,6 @@
+[package]
+name = "onioncontrol"
+version = "0.1.0"
+authors = ["Matthew Finkel <Matthew.Finkel@gmail.com>"]
+
+[dependencies]
