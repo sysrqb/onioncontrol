@@ -133,7 +133,7 @@ impl ControlConnection {
         // Split across multiple lines with braces for readability
         let vec_result =
             raw_cookie.iter().map(|&c| {
-                                  write!(&mut buf, "{:X}", c)
+                                  write!(&mut buf, "{:02X}", c)
             }).collect::<Vec<Result<(), FmtError>>>();
         for res in vec_result {
             if let Err(r) = res {
