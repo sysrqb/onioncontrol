@@ -307,6 +307,24 @@ impl ControlConnection {
         Ok(())
     }
 
+    fn send_signal(&mut self, signal: String) -> Result<(), ()> {
+        let command = vec!["SIGNAL".to_string(), signal];
+        match self.send_command(&command) {
+            Err(r) => {
+                println!("Writing to control socket failed: {:?}", r);
+                return Err(());
+            },
+            Ok(_) => {},
+        };
+
+        if self.command_successful().is_err() {
+            println!("Response code indicates a failure");
+            return Err(());
+        }
+
+        Ok(())
+    }
+
     fn print_result(&mut self) {
         // buf is a circular buffer, we're done when it contains b'250 OK\r\n'
         let mut buf: [u8; 8] = [0; 8];
@@ -373,11 +391,13 @@ impl ControlConnection {
 enum RuntimeMode {
     GETINFO,
     SETEVENTS,
+    SIGNAL,
 }
 
 fn print_help() {
     println!("Syntax: blah [-e] <args>");
     println!("  -e    enables SETEVENTS mode");
+    println!("  -s    enables SIGNAL mode");
 }
 
 // Very hacky and minimal arg parsing
@@ -401,6 +421,8 @@ fn get_args() -> Option<(RuntimeMode, String)> {
 
     if arg == "-e" {
         mode = RuntimeMode::SETEVENTS;
+    } else if arg == "-s" {
+        mode = RuntimeMode::SIGNAL;
     } else {
         write!(remaining_args, "{} ", arg).unwrap();
     }
@@ -444,6 +466,9 @@ fn main() {
             } else if let RuntimeMode::SETEVENTS = mode {
                 conn.set_events(args).expect("SETEVENTS failed");
                 conn.print_events();
+            } else if let RuntimeMode::SIGNAL = mode {
+                conn.send_signal(args).expect("SETEVENTS failed");
+                conn.print_result();
             }
         },
         None => (),
