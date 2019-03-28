@@ -284,7 +284,17 @@ impl ControlConnection {
         Ok(())
     }
 
-    fn set_events(&mut self, events: String) -> Result<(), ()> {
+    fn set_events(&mut self, user_events: String) -> Result<(), ()> {
+        let default_events = "CIRC CIRC_MINOR GUARD HS_DESC NETWORK_LIVENESS ORCONN STATUS_GENERAL STREAM STATUS_CLIENT".to_string();
+
+        let events;
+        if user_events.is_empty() {
+            println!("Using default events");
+            events = default_events;
+        } else {
+            events = user_events;
+        }
+
         let command = vec!["SETEVENTS".to_string(), events];
         match self.send_command(&command) {
             Err(r) => {
@@ -395,9 +405,10 @@ enum RuntimeMode {
 }
 
 fn print_help() {
-    println!("Syntax: blah [-e] <args>");
+    println!("Syntax: blah [-es] <args>");
     println!("  -e    enables SETEVENTS mode");
     println!("  -s    enables SIGNAL mode");
+    println!("  GETINFO by default");
 }
 
 // Very hacky and minimal arg parsing
@@ -432,8 +443,9 @@ fn get_args() -> Option<(RuntimeMode, String)> {
         write!(remaining_args, "{} ", arg).unwrap();
     }
 
-    if remaining_args.len() == 0 {
-        return None;
+    if remaining_args.is_empty() {
+        // Add the trailing space expected below
+        write!(remaining_args, " ").unwrap();
     }
 
     // Drop the trailing space in line
