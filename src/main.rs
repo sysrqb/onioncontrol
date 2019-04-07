@@ -336,6 +336,26 @@ impl ControlConnection {
         Ok(())
     }
 
+    // TODO Vendor chrono and use it directly for proper formating
+    fn format_time(&self, now: time::SystemTime) -> String {
+        // Copied from crono/datetime.rs
+        let (sec, nsec) = match now.duration_since(time::SystemTime::UNIX_EPOCH) {
+            Ok(dur) => (dur.as_secs() as i64, dur.subsec_nanos()),
+            Err(e) => { // unlikely but should be handled
+                let dur = e.duration();
+                let (sec, nsec) = (dur.as_secs() as i64, dur.subsec_nanos());
+                if nsec == 0 {
+                    (-sec, 0)
+                } else {
+                    (-sec - 1, 1_000_000_000 - nsec)
+                }
+            },
+        };
+
+        let secs = format!("{}.{}", sec, nsec);
+        return secs;
+    }
+
     fn print_result(&mut self) {
         // buf is a circular buffer, we're done when it contains b'250 OK\r\n'
         let mut buf: [u8; 8] = [0; 8];
@@ -344,7 +364,7 @@ impl ControlConnection {
         let now = time::SystemTime::now();
 
         // TODO: This isn't human-readable or meaningful
-        print!("{:?}: ", now);
+        print!("{}: ", self.format_time(now));
 
         loop {
             let count = match self.read_from_control_socket(&mut c) {
@@ -356,6 +376,7 @@ impl ControlConnection {
             };
             
             if count == 0 {
+                print!("\n");
                 return;
             }
 
@@ -365,9 +386,16 @@ impl ControlConnection {
             let next = self.get_str_from_bytes(&c).unwrap();
             print!("{}", next);
 
+            if next == "\n" {
+                //print!("{} - ", self.format_time(time::SystemTime::now()));
+                let now = time::SystemTime::now();
+                print!("{} - ", self.format_time(now));
+            }
+
             // "250 OK" may be sent on its own line, but we may only get " OK"
             // because the "250"-prefix was eaten by command_succesful().
             if buf.ends_with(b"\0\0\0 OK\r\n") || buf.ends_with(b"250 OK\r\n") {
+                print!("\n");
                 return;
             }
 
@@ -380,7 +408,7 @@ impl ControlConnection {
         let mut c: [u8; 1] = [0; 1];
         let now = time::SystemTime::now();
         // TODO: This isn't human-readable or meaningful
-        print!("{:?}: ", now);
+        print!("{}: ", self.format_time(now));
 
         loop {
             let count = match self.read_from_control_socket(&mut c) {
@@ -392,11 +420,17 @@ impl ControlConnection {
             };
             
             if count == 0 {
+                print!("\n");
                 return;
             }
 
             let next = self.get_str_from_bytes(&c).unwrap();
             print!("{}", next);
+
+            if next == "\n" {
+                let now = time::SystemTime::now();
+                print!("{} - ", self.format_time(now));
+            }
         }
     }
 }
