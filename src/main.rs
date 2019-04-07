@@ -192,6 +192,7 @@ impl ControlConnection {
             }
             return Err(());
         }
+        println!("Found 250");
 
         Ok(())
     }
@@ -364,7 +365,9 @@ impl ControlConnection {
             let next = self.get_str_from_bytes(&c).unwrap();
             print!("{}", next);
 
-            if buf.ends_with(b"250 OK\r\n") {
+            // "250 OK" may be sent on its own line, but we may only get " OK"
+            // because the "250"-prefix was eaten by command_succesful().
+            if buf.ends_with(b"\0\0\0 OK\r\n") || buf.ends_with(b"250 OK\r\n") {
                 return;
             }
 
