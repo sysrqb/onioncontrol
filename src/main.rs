@@ -2,6 +2,7 @@ use std::env;
 use std::fmt::{Error as FmtError, Write as FmtWrite};
 use std::fs::File;
 use std::io::{Error as IoError, Read, Write as IoWrite};
+use std::net::Shutdown;
 use std::os::unix::net::UnixStream;
 use std::str;
 use std::str::Utf8Error;
@@ -72,6 +73,12 @@ impl ControlConnection {
     }
 
     fn read_all_from_control_socket(&mut self, output: &mut String) -> Result<usize, IoError> {
+        // Close the socket so EOF is received after reading all buffered data
+        if let Err(r) = self.control_socket.shutdown(Shutdown::Both) {
+            println!("Shutting down control connection failed!");
+            return Err(r);
+        }
+
         loop {
             let res = self.control_socket.read_to_string(output);
             match res {
@@ -336,6 +343,43 @@ impl ControlConnection {
         Ok(())
     }
 
+    fn close_stream(&mut self, streamid: String) -> Result<(), ()> {
+        // Always REASON_CONNRESET
+        let command = vec!["CLOSESTREAM".to_string(), streamid, "12".to_string()];
+        match self.send_command(&command) {
+            Err(r) => {
+                println!("Writing to control socket failed: {:?}", r);
+                return Err(());
+            },
+            Ok(_) => {},
+        };
+
+        if self.command_successful().is_err() {
+            println!("Response code indicates a failure");
+            return Err(());
+        }
+
+        Ok(())
+    }
+
+    fn close_circuit(&mut self, circid: String) -> Result<(), ()> {
+        let command = vec!["CLOSECIRCUIT".to_string(), circid];
+        match self.send_command(&command) {
+            Err(r) => {
+                println!("Writing to control socket failed: {:?}", r);
+                return Err(());
+            },
+            Ok(_) => {},
+        };
+
+        if self.command_successful().is_err() {
+            println!("Response code indicates a failure");
+            return Err(());
+        }
+
+        Ok(())
+    }
+
     // TODO Vendor chrono and use it directly for proper formating
     fn format_time(&self, now: time::SystemTime) -> String {
         // Copied from crono/datetime.rs
@@ -439,12 +483,16 @@ enum RuntimeMode {
     GETINFO,
     SETEVENTS,
     SIGNAL,
+    CLOSESTREAM,
+    CLOSECIRCUIT,
 }
 
 fn print_help() {
     println!("Syntax: blah [-es] <args>");
     println!("  -e    enables SETEVENTS mode");
     println!("  -s    enables SIGNAL mode");
+    println!("  -cs   enables CLOSESTREAM mode");
+    println!("  -cc   enables CLOSECIRCUIT mode");
     println!("  GETINFO by default");
 }
 
@@ -471,6 +519,10 @@ fn get_args() -> Option<(RuntimeMode, String)> {
         mode = RuntimeMode::SETEVENTS;
     } else if arg == "-s" {
         mode = RuntimeMode::SIGNAL;
+    } else if arg == "-cs" {
+        mode = RuntimeMode::CLOSESTREAM;
+    } else if arg == "-cc" {
+        mode = RuntimeMode::CLOSECIRCUIT;
     } else {
         write!(remaining_args, "{} ", arg).unwrap();
     }
@@ -518,6 +570,18 @@ fn main() {
             } else if let RuntimeMode::SIGNAL = mode {
                 conn.send_signal(args).expect("SETEVENTS failed");
                 conn.print_result();
+            } else if let RuntimeMode::CLOSESTREAM = mode {
+                if let Err(_) = conn.close_stream(args) {
+                    println!("CLOSESTREAM failed");
+                } else {
+                    conn.print_result();
+                }
+            } else if let RuntimeMode::CLOSECIRCUIT = mode {
+                if let Err(_) = conn.close_circuit(args) {
+                    println!("CLOSECIRCUIT failed");
+                } else {
+                    conn.print_result();
+                }
             }
         },
         None => (),
