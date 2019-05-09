@@ -1,0 +1,19 @@
+This is currently a half-baked controller for a Tor client.
+
+Running:
+
+  $ cargo build
+
+should just-work. It assumes the controller cookie is located at
+`/run/tor/control.authcookie`. It uses COOKIE authentication, so use this at
+your own risk. It assumes there is a UNIX Domain socket at `/run/tor/control`.
+
+If either of these files are not readable by the user running this program,
+then either switch users or run it as root. Again, as stated above, "This is
+currently a half-baked controller" and "use this at your own risk". This is how
+I use it, but I wrote it.
+
+It currently supports:
+  - subscribing to events emitted by tor
+  - sending a signal to tor
+  - sending a CLOSESTREAM and CLOSECIRCUIT
