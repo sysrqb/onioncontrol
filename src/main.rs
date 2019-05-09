@@ -396,7 +396,7 @@ impl ControlConnection {
             },
         };
 
-        let secs = format!("{}.{}", sec, nsec);
+        let secs = format!("{}.{:09}", sec, nsec);
         return secs;
     }
 
